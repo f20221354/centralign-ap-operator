@@ -193,6 +193,11 @@ def classify(obs):
     return "UNKNOWN"           # reconcile against the ERP before doing anything else
 
 
+# --no-sandbox / --disable-dev-shm-usage are needed inside containers; the rest keep Chromium small on a 512 MB host
+LAUNCH_ARGS = ["--no-sandbox", "--disable-dev-shm-usage", "--disable-gpu", "--disable-extensions",
+               "--disable-background-networking", "--renderer-process-limit=1", "--js-flags=--max-old-space-size=96"]
+
+
 class LoginFailed(Exception):
     pass
 
@@ -200,7 +205,7 @@ class LoginFailed(Exception):
 class Browser:
     def __init__(self, shots_dir, headless=True):
         self.pw = sync_playwright().start()
-        self.page = self.pw.chromium.launch(headless=headless, args=["--no-sandbox", "--disable-dev-shm-usage"]).new_page()  # flags: needed inside containers
+        self.page = self.pw.chromium.launch(headless=headless, args=LAUNCH_ARGS).new_page()
         self.page.set_default_timeout(45000)  # slow hosts (a 0.1-CPU free tier) need more than 15 s per step
         self.dir, self.n = shots_dir, 0
 

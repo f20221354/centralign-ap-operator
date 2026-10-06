@@ -74,6 +74,8 @@ def runs():
 
 @app.get("/runs/{run_id}/events")
 def events(run_id: str, after: int = 0):
+    if not store.q("select id from runs where id=?", run_id):
+        raise HTTPException(404, "unknown run")  # e.g. the server restarted and lost it
     return {"run": store.run(run_id), "events": store.events(run_id, after),
             "pending": store.q("select * from requests where run_id=? and status='PENDING'", run_id)}
 
@@ -143,7 +145,9 @@ async function reset(){msg.textContent='resetting...';try{const r=await fetch('/
 async function answer(id,st){const a=document.getElementById('a'+id);await fetch('/requests/'+id,{method:'POST',
  headers:{'content-type':'application/json'},body:JSON.stringify({status:st,answer:a?a.value:''})});}
 async function poll(){try{if(!run){const rs=await (await fetch('/runs')).json();if(rs.length)run=rs[0].id;}
- if(run){const d=await (await fetch(`/runs/${run}/events?after=${last}`)).json();
+ if(run){const resp=await fetch(`/runs/${run}/events?after=${last}`);
+ if(resp.status==404){run=null;sessionStorage.removeItem('run');pending.innerHTML='';msg.textContent='That run no longer exists (the server restarted). Click Start run.';setTimeout(poll,1000);return;}
+ const d=await resp.json();
  msg.textContent=`run ${run}: ${d.run.status}`;
  for(const e of d.events){last=e.id;const shot=e.data.screenshot?`<br><img src="/shots/${run}/${e.data.screenshot}">`:'';
   trace.insertAdjacentHTML('beforeend',`<div class="ev ${tone(e)}"><b>${e.type}</b> <small>${new Date(e.ts*1000)

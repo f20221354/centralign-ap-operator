@@ -204,10 +204,18 @@ class Run:
         return {"ok": True}
 
     def t_create_invoice(self, file, **inv):
+        # Chromium is the memory hog (a 512 MB host was getting killed), so it lives only while one invoice is entered.
+        self.browser = Browser(RUNS / self.id, self.headless)
+        try:
+            return self.enter_invoice(file, inv)
+        finally:
+            self.browser.close()
+            self.browser = None
+
+    def enter_invoice(self, file, inv):
         """Execute -> observe -> classify -> retry / re-auth / adapt / reconcile. Idempotent by design."""
         path = self.inbox_file(file)
         key = hashlib.sha256(f"{inv['vendor_id']}|{inv['invoice_number']}".encode()).hexdigest()[:20]
-        self.browser = self.browser or Browser(RUNS / self.id, self.headless)
         for attempt in range(1, MAX_ATTEMPTS + 1):
             self.log("ACTION_STARTED", key=key, file=file, attempt=attempt)
             obs = self.browser.submit_invoice(inv, key, self.pick_button)
