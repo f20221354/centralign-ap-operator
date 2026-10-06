@@ -122,7 +122,7 @@ button{cursor:pointer}#goal{width:min(560px,100%)}.row{display:flex;gap:8px;flex
 <h1>CentrAlign Operator Console</h1>
 <div class=row><input id=goal value="Process this week's vendor invoices">
 <button onclick=go()>Start run</button><button onclick=reset()>Reset demo data</button>
-<small id=status></small></div>
+<small id=msg></small></div>
 <div id=pending></div><h3>Live trace</h3><div id=trace><small>No run yet.</small></div>
 <h3>Report</h3><pre id=report></pre>
 <script>
@@ -131,13 +131,14 @@ const tone=e=>{const d=JSON.stringify(e.data);return /DENY|error|FAILED/.test(d+
  /COMPLETED|VERIFIED|APPROVED/.test(d+e.type)?'OK':/RETRY|ADAPT|RECONCIL|HUMAN/.test(e.type)?'WARN':''};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 async function go(){const r=await fetch('/runs',{method:'POST',headers:{'content-type':'application/json'},
- body:JSON.stringify({goal:goal.value})});if(!r.ok){status.textContent=(await r.json()).detail||'could not start';return;}
+ body:JSON.stringify({goal:goal.value})});if(!r.ok){msg.textContent=(await r.json()).detail||'could not start';return;}
  run=(await r.json()).run_id;last=0;trace.innerHTML='';report.textContent='';}
-async function reset(){await fetch('/reset',{method:'POST'});status.textContent='demo data reset';}
+async function reset(){msg.textContent='resetting...';try{const r=await fetch('/reset',{method:'POST'});
+ msg.textContent=r.ok?'demo data reset':'reset failed: '+r.status;}catch(e){msg.textContent='reset failed: '+e;}}
 async function answer(id,st){const a=document.getElementById('a'+id);await fetch('/requests/'+id,{method:'POST',
  headers:{'content-type':'application/json'},body:JSON.stringify({status:st,answer:a?a.value:''})});}
 async function poll(){if(run){const d=await (await fetch(`/runs/${run}/events?after=${last}`)).json();
- status.textContent=`run ${run}: ${d.run.status}`;
+ msg.textContent=`run ${run}: ${d.run.status}`;
  for(const e of d.events){last=e.id;const shot=e.data.screenshot?`<br><img src="/shots/${run}/${e.data.screenshot}">`:'';
   trace.insertAdjacentHTML('beforeend',`<div class="ev ${tone(e)}"><b>${e.type}</b> <small>${new Date(e.ts*1000)
   .toLocaleTimeString()}</small><br>${esc(JSON.stringify(e.data)).slice(0,600)}${e.type=='ACTION_COMPLETED'?shot:''}</div>`);}
