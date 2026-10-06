@@ -7,3 +7,5 @@ company/processed/
 company/flagged/
 company/lessons.json
 .env
+.vercel
+.env.local
