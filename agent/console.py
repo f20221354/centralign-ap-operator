@@ -2,10 +2,13 @@
 
   uvicorn agent.console:app --port 8000
 """
+import base64
+import os
+import secrets
 import threading
 
-from fastapi import FastAPI
-from fastapi.responses import HTMLResponse, PlainTextResponse
+from fastapi import FastAPI, HTTPException, Request
+from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
@@ -14,6 +17,24 @@ from agent.runtime import Run, reset_workspace
 from agent.store import RUNS
 
 app = FastAPI(title="CentrAlign Operator Console")
+ACTIVE = {"thread": None}  # one run at a time: each run spends LLM quota and a browser's worth of memory
+
+
+@app.middleware("http")
+async def password_gate(request: Request, call_next):
+    """If CONSOLE_PASSWORD is set (it is when deployed), every request but /healthz needs it (HTTP Basic, any username).
+    Unset = local use, open. Read per request so it can be set after import."""
+    password = os.environ.get("CONSOLE_PASSWORD")
+    if password and request.url.path != "/healthz":
+        try:
+            given = base64.b64decode(request.headers.get("authorization", "")[6:]).decode().partition(":")[2]
+        except ValueError:
+            given = ""
+        if not secrets.compare_digest(given.encode(), password.encode()):
+            return Response("Password required", 401, headers={"WWW-Authenticate": 'Basic realm="Operator Console"'})
+    return await call_next(request)
+
+
 app.mount("/shots", StaticFiles(directory=RUNS), name="shots")
 
 
@@ -28,6 +49,8 @@ class Answer(BaseModel):
 
 @app.post("/runs")
 def start(g: Goal):
+    if ACTIVE["thread"] and ACTIVE["thread"].is_alive():
+        raise HTTPException(409, "A run is already in progress. Wait for it to finish.")
     run = Run(g.goal, headless=True)
 
     def target():
@@ -37,7 +60,8 @@ def start(g: Goal):
             run.log("RUN_ERROR", error=f"{type(e).__name__}: {e}")
             store.set_status(run.id, "FAILED")
 
-    threading.Thread(target=target, daemon=True).start()
+    ACTIVE["thread"] = threading.Thread(target=target, daemon=True)
+    ACTIVE["thread"].start()
     return {"run_id": run.id}
 
 
@@ -67,6 +91,11 @@ def report(run_id: str):
 @app.post("/reset")
 def reset():
     reset_workspace()
+    return {"ok": True}
+
+
+@app.get("/healthz")
+def healthz():
     return {"ok": True}
 
 
@@ -102,7 +131,8 @@ const tone=e=>{const d=JSON.stringify(e.data);return /DENY|error|FAILED/.test(d+
  /COMPLETED|VERIFIED|APPROVED/.test(d+e.type)?'OK':/RETRY|ADAPT|RECONCIL|HUMAN/.test(e.type)?'WARN':''};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
 async function go(){const r=await fetch('/runs',{method:'POST',headers:{'content-type':'application/json'},
- body:JSON.stringify({goal:goal.value})});run=(await r.json()).run_id;last=0;trace.innerHTML='';report.textContent='';}
+ body:JSON.stringify({goal:goal.value})});if(!r.ok){status.textContent=(await r.json()).detail||'could not start';return;}
+ run=(await r.json()).run_id;last=0;trace.innerHTML='';report.textContent='';}
 async function reset(){await fetch('/reset',{method:'POST'});status.textContent='demo data reset';}
 async function answer(id,st){const a=document.getElementById('a'+id);await fetch('/requests/'+id,{method:'POST',
  headers:{'content-type':'application/json'},body:JSON.stringify({status:st,answer:a?a.value:''})});}

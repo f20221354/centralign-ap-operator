@@ -1,0 +1,24 @@
+# Render Blueprint: New + > Blueprint, pick this repo. Fill the "sync: false" variables in the dashboard.
+services:
+  - type: web
+    name: centralign-operator
+    runtime: docker
+    plan: starter            # Chromium needs more than the free tier's 512 MB to be reliable
+    healthCheckPath: /healthz
+    envVars:
+      - key: CONSOLE_PASSWORD
+        generateValue: true  # Render creates a random password; read it in the dashboard under Environment
+      - key: LLM_CHAIN
+        value: groq,gemini   # no local Ollama in the cloud
+      - key: ERP_URL
+        value: https://centralign-ap-operator.vercel.app
+      - key: ERP_API_KEY
+        sync: false
+      - key: ERP_USER
+        sync: false
+      - key: ERP_PASS
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false

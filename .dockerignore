@@ -1,0 +1,15 @@
+.venv
+.git
+.env
+.vercel
+runs
+mock_erp
+brain
+tests
+evals
+scripts
+__pycache__
+company/inbox
+company/processed
+company/flagged
+company/lessons.json

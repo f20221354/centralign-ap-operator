@@ -154,6 +154,23 @@ Deploy the `mock_erp/` folder (it is self-contained: `app.py` + `requirements.tx
 
 Only the ERP goes on Vercel. The agent, console and LLM keys stay on your machine.
 
+## Deploy the Operator Console (Render + a Vercel front)
+
+The console needs a real Chromium and runs that last minutes, so it can't be a Vercel function. It runs as a
+Docker service on Render (`Dockerfile`, `render.yaml`). Tested locally: the image builds, Chromium submits an
+invoice to the live ERP from inside it, and peak memory was about 290 MB.
+
+1. Render dashboard → **New + → Blueprint** → pick this repo. It reads `render.yaml`.
+2. Fill the variables marked `sync: false`: `ERP_API_KEY`, `ERP_USER`, `ERP_PASS` (same values as on the ERP's
+   Vercel project) and `GROQ_API_KEY`, `GEMINI_API_KEY`. `CONSOLE_PASSWORD` is generated for you: read it under
+   **Environment**.
+3. Open the service URL. The browser asks for a password (any username, the `CONSOLE_PASSWORD`).
+
+The console is password-protected whenever `CONSOLE_PASSWORD` is set, and allows one run at a time, because a
+public link would otherwise let anyone spend your LLM quota. Free-tier LLM keys limit how many full runs fit in a
+day. To also get a `vercel.app` address, a Vercel project containing one `vercel.json` rewrite forwards every
+request to the Render URL.
+
 ## Honest limitations
 
 - One workflow (accounts payable). The loop, policy gate, verifier and event log are generic; a new workflow is

@@ -158,7 +158,7 @@ def classify(obs):
 class Browser:
     def __init__(self, shots_dir, headless=True):
         self.pw = sync_playwright().start()
-        self.page = self.pw.chromium.launch(headless=headless).new_page()
+        self.page = self.pw.chromium.launch(headless=headless, args=["--no-sandbox", "--disable-dev-shm-usage"]).new_page()  # flags: needed inside containers
         self.page.set_default_timeout(15000)
         self.dir, self.n = shots_dir, 0
 

@@ -193,5 +193,20 @@ class ArgsTest(unittest.TestCase):
                                         .replace('"42,300".replace(",","") ', '"42300"'))["amount"], 42300.0)
 
 
+class ConsoleAuthTest(unittest.TestCase):
+    def test_password_gate(self):
+        from agent import console
+        c = TestClient(console.app)
+        os.environ["CONSOLE_PASSWORD"] = "s3cret"
+        try:
+            self.assertEqual(c.get("/runs").status_code, 401)
+            self.assertEqual(c.post("/runs", json={"goal": "x"}).status_code, 401)  # can't start runs unauthenticated
+            self.assertEqual(c.get("/runs", auth=("anyone", "wrong")).status_code, 401)
+            self.assertEqual(c.get("/runs", auth=("anyone", "s3cret")).status_code, 200)
+        finally:
+            del os.environ["CONSOLE_PASSWORD"]
+        self.assertEqual(c.get("/runs").status_code, 200)  # unset = local, open
+
+
 if __name__ == "__main__":
     unittest.main()
