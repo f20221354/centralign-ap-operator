@@ -3,7 +3,7 @@ services:
   - type: web
     name: centralign-operator
     runtime: docker
-    plan: starter            # Chromium needs more than the free tier's 512 MB to be reliable
+    plan: free               # 512 MB: peak was ~290 MB in testing, so tight but workable. Use starter if Chromium gets killed.
     healthCheckPath: /healthz
     envVars:
       - key: CONSOLE_PASSWORD
