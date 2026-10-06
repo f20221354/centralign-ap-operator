@@ -219,6 +219,8 @@ class Run:
                 shutil.move(path, PROCESSED / file)
                 self.log("ACTION_COMPLETED", key=key, file=file, erp_id=erp_id, screenshot=obs["screenshot"])
                 return {"created": True, "erp_id": erp_id, "notes": obs["notes"]}
+            if kind == "FATAL":
+                return {"error": obs["text"]}
             if kind == "BUSINESS":
                 return {"error": f"ERP rejected the form: {obs['text']}"}
             if kind == "AUTH":

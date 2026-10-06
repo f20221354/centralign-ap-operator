@@ -164,6 +164,8 @@ class ERP:
 
 def classify(obs):
     """Observation -> what kind of outcome it was, which decides the recovery route."""
+    if "ERP login failed" in obs["text"]:
+        return "FATAL"         # wrong credentials: retrying can't help
     if re.search(r"/invoices/\d+$", obs["url"]):
         return "SUCCESS"
     if "/login" in obs["url"]:
@@ -173,6 +175,10 @@ def classify(obs):
     if obs.get("status") in (409, 422):
         return "BUSINESS"      # the ERP rejected the data: give it back to the model to replan
     return "UNKNOWN"           # reconcile against the ERP before doing anything else
+
+
+class LoginFailed(Exception):
+    pass
 
 
 class Browser:
@@ -199,6 +205,9 @@ class Browser:
         p.get_by_label("Password").fill(os.environ.get("ERP_PASS", "ops123"))
         p.get_by_role("button", name="Log in").click()
         p.wait_for_load_state()
+        if "/login" in p.url:  # a good login redirects away from /login; staying means the ERP rejected the credentials
+            raise LoginFailed("ERP login failed: the ERP rejected ERP_USER / ERP_PASS. This is a configuration "
+                              "problem for a human to fix, not something to retry.")
 
     def submit_invoice(self, inv, key, adapt):
         """Fill and post the New invoice form. Returns an observation; never decides success itself."""
@@ -231,6 +240,8 @@ class Browser:
             err = p.get_by_role("alert")
             text = err.inner_text() if err.count() else p.inner_text("body")[:500]
             return {"url": p.url, "status": status, "text": text, "notes": notes, "screenshot": self.shot(key)}
+        except LoginFailed as e:
+            return {"url": p.url, "status": 401, "text": str(e), "notes": notes, "screenshot": self.shot("login-failed")}
         except PlaywrightError as e:
             return {"url": p.url, "status": 0, "text": f"timeout/browser error: {e}"[:500], "notes": notes,
                     "screenshot": self.shot(f"{key}-error")}
