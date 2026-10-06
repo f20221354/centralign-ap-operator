@@ -20,9 +20,12 @@ PROVIDERS = {
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "GROQ_MODEL", "openai/gpt-oss-120b"),
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "GEMINI_MODEL",
                "gemini-2.5-flash"),
+    "mistral": ("https://api.mistral.ai/v1", "MISTRAL_API_KEY", "MISTRAL_MODEL", "mistral-small-latest"),
+    "openrouter": ("https://openrouter.ai/api/v1", "OPENROUTER_API_KEY", "OPENROUTER_MODEL",
+                   "openai/gpt-oss-120b:free"),
     "ollama": (os.environ.get("OLLAMA_URL", "http://localhost:11434/v1"), None, "OLLAMA_MODEL", "qwen2.5:7b"),
 }
-CHAIN = [n.strip() for n in os.environ.get("LLM_CHAIN", "groq,gemini,ollama").split(",")]
+CHAIN = [n.strip() for n in os.environ.get("LLM_CHAIN", "groq,gemini,mistral,openrouter,ollama").split(",")]
 MAX_WAIT_S = 30  # a rate limit that clears sooner than this is waited out; a longer one means "quota gone"
 
 

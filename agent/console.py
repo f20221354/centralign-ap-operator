@@ -12,7 +12,7 @@ from fastapi.responses import HTMLResponse, PlainTextResponse, Response
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
-from agent import store
+from agent import store, tools
 from agent.runtime import Run, reset_workspace
 from agent.store import RUNS
 
@@ -99,7 +99,7 @@ def reset():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True}
+    return {"ok": True, "providers": [n for n in tools.CHAIN if tools.available(n)]}  # names only, never keys
 
 
 @app.get("/", response_class=HTMLResponse)

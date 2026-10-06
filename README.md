@@ -80,7 +80,7 @@ Tests: `.venv/bin/python -m unittest -v tests.test_core` · Benchmark: `.venv/bi
 ### Choosing the LLM
 
 Every provider speaks the OpenAI chat protocol, so one code path serves all of them. `LLM_CHAIN` (default
-`groq,gemini,ollama`) is the order they are tried in. Providers without a key are skipped.
+`groq,gemini,mistral,openrouter,ollama`) is the order they are tried in. Providers without a key are skipped.
 
 | Situation | What happens |
 |---|---|
@@ -88,7 +88,7 @@ Every provider speaks the OpenAI chat protocol, so one code path serves all of t
 | Daily quota, outage, request too large | switch to the next provider; the failed one sits out for 60 s |
 | Switch happens | logged as `PROVIDER_IN_USE` in the trace |
 
-Free keys: Groq at console.groq.com, Gemini at aistudio.google.com. Local fallback: `ollama pull qwen2.5:7b`.
+Free keys: Groq at console.groq.com, Gemini at aistudio.google.com, Mistral at console.mistral.ai (needs phone verification), OpenRouter at openrouter.ai (`:free` models, small daily limit). Local fallback: `ollama pull qwen2.5:7b`.
 Defaults: `openai/gpt-oss-120b` (Groq), `gemini-2.5-flash`, `qwen2.5:7b`; override with `GROQ_MODEL`,
 `GEMINI_MODEL`, `OLLAMA_MODEL`. Quote results together with the model that produced them: small local
 models make noticeably more mistakes, and the policy gate and verifier are what stop those becoming bad
