@@ -1,0 +1,9 @@
+openai
+pypdf
+fastapi
+uvicorn
+sqlalchemy
+python-multipart
+playwright
+httpx
+reportlab

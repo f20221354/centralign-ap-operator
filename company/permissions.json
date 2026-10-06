@@ -1,0 +1,7 @@
+{
+  "agent": "ap-operator",
+  "allowed_tools": ["list_inbox", "read_invoice", "list_vendors", "lookup_po", "find_invoice",
+                    "create_invoice", "flag_invoice", "ask_human", "finish"],
+  "approval_threshold_inr": 50000,
+  "po_tolerance": 0.02
+}
