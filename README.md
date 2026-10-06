@@ -14,6 +14,10 @@ Goal → Understand (SOP + lessons) → Plan/act (LLM) → Policy gate (code) �
 approvals, idempotency, retries and verification are plain Python, so a prompt-injected model cannot get past
 them.
 
+**Showcase (public, installable on a phone): https://centralign-demo.vercel.app** — what it does, the design, the seven
+test invoices, and a replay of a real verified run. Source in `demo/` (one static page, no build step; add it to the
+home screen on Android or iOS and it works offline).
+
 ## Architecture
 
 ```
@@ -52,6 +56,7 @@ than the one the agent wrote through.
 | `agent/console.py` | Operator Console: start a run, live trace, Approve / Reject, answers, report |
 | `evals/run.py` | Benchmark across failure modes → writes `evals/results.md` |
 | `tests/test_core.py` | 14 tests: idempotency under concurrency, policy, verifier, provider failover (no model or network needed) |
+| `demo/` | The public showcase: a static, installable web app with a replay of a recorded run |
 | `brain/` | Engineering source of truth: rules, architecture, data model, security, decisions, plan |
 
 ## Run it locally
