@@ -90,7 +90,10 @@ def report(run_id: str):
 
 @app.post("/reset")
 def reset():
-    reset_workspace()
+    try:
+        reset_workspace()
+    except Exception as e:  # say what failed (e.g. ERP rejected the key) instead of a bare 500
+        raise HTTPException(500, f"{type(e).__name__}: {e}")
     return {"ok": True}
 
 
@@ -134,7 +137,7 @@ async function go(){const r=await fetch('/runs',{method:'POST',headers:{'content
  body:JSON.stringify({goal:goal.value})});if(!r.ok){msg.textContent=(await r.json()).detail||'could not start';return;}
  run=(await r.json()).run_id;last=0;trace.innerHTML='';report.textContent='';}
 async function reset(){msg.textContent='resetting...';try{const r=await fetch('/reset',{method:'POST'});
- msg.textContent=r.ok?'demo data reset':'reset failed: '+r.status;}catch(e){msg.textContent='reset failed: '+e;}}
+ msg.textContent=r.ok?'demo data reset':'reset failed: '+r.status+' '+(await r.text()).slice(0,300);}catch(e){msg.textContent='reset failed: '+e;}}
 async function answer(id,st){const a=document.getElementById('a'+id);await fetch('/requests/'+id,{method:'POST',
  headers:{'content-type':'application/json'},body:JSON.stringify({status:st,answer:a?a.value:''})});}
 async function poll(){if(run){const d=await (await fetch(`/runs/${run}/events?after=${last}`)).json();
