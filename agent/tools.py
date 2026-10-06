@@ -40,6 +40,10 @@ def available(name):
 
 def call(name, messages, tools):
     """One request to one provider."""
+    gap = MIN_GAP.get(name, 0) - (time.time() - LAST_CALL.get(name, 0))
+    if gap > 0:
+        time.sleep(gap)
+    LAST_CALL[name] = time.time()
     base, key_env, *_ = PROVIDERS[name]
     c = openai.OpenAI(base_url=base, api_key=os.environ.get(key_env, "ollama") if key_env else "ollama",
                       max_retries=0, timeout=180)
@@ -48,6 +52,10 @@ def call(name, messages, tools):
 
 
 COOLDOWN = {}  # provider -> time before which it is skipped
+# Minimum seconds between calls to one provider, kept just under each free tier's requests-per-minute limit, so
+# the agent paces itself instead of bursting into 429s. A paid or local provider needs none.
+MIN_GAP = {"groq": 2.2, "gemini": 6.5, "mistral": 1.2, "openrouter": 3.2}
+LAST_CALL = {}
 COOLDOWN_S = 60
 
 

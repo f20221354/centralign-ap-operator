@@ -129,6 +129,8 @@ class ChainTest(unittest.TestCase):
     def setUp(self):
         self.calls, self.slept = [], []
         tools.COOLDOWN.clear()
+        self._gap = dict(tools.MIN_GAP)
+        tools.MIN_GAP.clear()  # these tests are about failover, not pacing
         self._call, self._sleep, self._chain = tools.call, tools.time.sleep, tools.CHAIN
         tools.time.sleep = self.slept.append
         tools.CHAIN = ["groq", "gemini"]
@@ -136,6 +138,7 @@ class ChainTest(unittest.TestCase):
 
     def tearDown(self):
         tools.call, tools.time.sleep, tools.CHAIN = self._call, self._sleep, self._chain
+        tools.MIN_GAP.update(self._gap)
 
     def use(self, behaviour):
         def fake(name, messages, tool_specs):
@@ -215,6 +218,24 @@ class ChainTest(unittest.TestCase):
         self.use(lambda name: (_ for _ in ()).throw(rate_limit("")))
         with self.assertRaisesRegex(RuntimeError, "groq.*gemini"):
             tools.llm([])
+
+
+class PacingTest(unittest.TestCase):
+    def test_second_call_to_a_free_provider_waits_for_the_gap(self):
+        sleeps, real, real_client = [], tools.time.sleep, tools.openai.OpenAI
+        tools.time.sleep = sleeps.append
+        tools.openai.OpenAI = lambda **kw: (_ for _ in ()).throw(RuntimeError("no network in tests"))
+        tools.LAST_CALL.clear()
+        try:
+            tools.MIN_GAP["gemini"] = 6.5
+            tools.LAST_CALL["gemini"] = tools.time.time() - 1.0  # last call was 1 s ago
+            try:
+                tools.call("gemini", [], None)  # would hit the network; we only care that it paced first
+            except Exception:
+                pass
+            self.assertTrue(sleeps and 5.0 < sleeps[0] <= 5.5, sleeps)
+        finally:
+            tools.time.sleep, tools.openai.OpenAI = real, real_client
 
 
 class ArgsTest(unittest.TestCase):
