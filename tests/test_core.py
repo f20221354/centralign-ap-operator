@@ -7,7 +7,7 @@ import threading
 import unittest
 from pathlib import Path
 
-os.environ["DATABASE_URL"] = f"sqlite:///{tempfile.mkdtemp()}/erp.db"
+os.environ.setdefault("DATABASE_URL", f"sqlite:///{tempfile.mkdtemp()}/erp.db")  # set it to test on Postgres
 from fastapi.testclient import TestClient  # noqa: E402
 
 from agent import policy, runtime, tools, verifier  # noqa: E402

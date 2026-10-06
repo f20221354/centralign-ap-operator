@@ -52,10 +52,14 @@ def reset():
                                           created_at=0))
 
 
-md.create_all(engine)
-with engine.connect() as _c:
-    if not _c.execute(select(vendors)).first():
+try:  # several serverless instances can cold-start at once; whoever loses the race just finds the data there
+    md.create_all(engine)
+    with engine.connect() as _c:
+        empty = not _c.execute(select(vendors)).first()
+    if empty:
         reset()
+except Exception:
+    md.create_all(engine)
 
 app = FastAPI(title="Acme ERP")
 
