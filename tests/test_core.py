@@ -199,6 +199,18 @@ class ChainTest(unittest.TestCase):
         self.assertEqual(tools.llm([])[1], "gemini")
         self.assertEqual(self.slept, [])  # no waiting for a billing problem
 
+    def test_waits_as_long_as_the_provider_asks(self):
+        n = {"i": 0}
+
+        def b(name):
+            n["i"] += 1
+            if n["i"] <= 2:  # both providers limited; groq says "come back in 130 s"
+                raise rate_limit("130" if name == "groq" else "")
+            return FakeReply()
+        self.use(b)
+        self.assertEqual(tools.llm([])[1], "groq")
+        self.assertIn(130, self.slept)  # one long pause, not a handful of 25 s ones
+
     def test_all_providers_failing_raises_with_reasons(self):
         self.use(lambda name: (_ for _ in ()).throw(rate_limit("")))
         with self.assertRaisesRegex(RuntimeError, "groq.*gemini"):

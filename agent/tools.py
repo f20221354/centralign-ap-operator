@@ -51,7 +51,8 @@ COOLDOWN = {}  # provider -> time before which it is skipped
 COOLDOWN_S = 60
 
 
-RATE_ROUNDS, RATE_WAIT_S = 8, 25  # free tiers: if every provider is only rate limited, wait and retry (~3 min)
+RATE_BUDGET_S, RATE_WAIT_S, RATE_MAX_PAUSE_S = 900, 25, 130  # free tiers: if everything is only rate limited, wait
+# as long as the providers ask (up to 130 s at a time) and keep trying for up to 15 minutes in total
 
 
 def llm(messages, tools=None):
@@ -59,8 +60,9 @@ def llm(messages, tools=None):
     flip back and forth between a strong and a weak model. If everything is merely rate limited (free tiers),
     wait and try again instead of killing the run. -> (assistant message, provider name).
     History is plain OpenAI-format dicts, so any provider can continue it."""
-    for round_ in range(RATE_ROUNDS):
-        errors, hard, now = [], False, time.time()
+    waited = 0
+    while True:
+        errors, hard, hints, now = [], False, [], time.time()
         names = [n for n in CHAIN if available(n)]
         ready = [n for n in names if COOLDOWN.get(n, 0) <= now] or names  # all cooling down: try anyway
         for name in ready:
@@ -77,6 +79,10 @@ def llm(messages, tools=None):
                         COOLDOWN[name] = time.time() + 3600
                         break
                     wait = e.response.headers.get("retry-after")
+                    try:
+                        hints.append(float(wait))
+                    except (TypeError, ValueError):
+                        pass
                     if wait and float(wait) <= MAX_WAIT_S and attempt < 2:
                         time.sleep(float(wait) + 0.5)  # per-minute limit: wait it out on the same provider
                         continue
@@ -91,9 +97,11 @@ def llm(messages, tools=None):
                     hard = True
                     break
             COOLDOWN[name] = max(COOLDOWN.get(name, 0), time.time() + COOLDOWN_S)
-        if hard or round_ == RATE_ROUNDS - 1:
+        if hard or waited >= RATE_BUDGET_S:
             break
-        time.sleep(RATE_WAIT_S)  # everything was only rate limited: give the quotas time to refill
+        pause = min(max([RATE_WAIT_S] + hints), RATE_MAX_PAUSE_S)  # everything was only rate limited:
+        time.sleep(pause)                                          # give the quotas time to refill
+        waited += pause
         COOLDOWN.clear()
     raise RuntimeError("every LLM provider failed: " + "; ".join(errors) +
                        f". Chain={CHAIN}; available={[n for n in CHAIN if available(n)]}. "
