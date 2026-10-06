@@ -47,37 +47,49 @@ COOLDOWN = {}  # provider -> time before which it is skipped
 COOLDOWN_S = 60
 
 
+RATE_ROUNDS, RATE_WAIT_S = 8, 25  # free tiers: if every provider is only rate limited, wait and retry (~3 min)
+
+
 def llm(messages, tools=None):
     """Ask the first provider that works; one that fails sits out for a minute, so a conversation doesn't
-    flip back and forth between a strong and a weak model. -> (assistant message, provider name).
+    flip back and forth between a strong and a weak model. If everything is merely rate limited (free tiers),
+    wait and try again instead of killing the run. -> (assistant message, provider name).
     History is plain OpenAI-format dicts, so any provider can continue it."""
-    errors, now = [], time.time()
-    names = [n for n in CHAIN if available(n)]
-    ready = [n for n in names if COOLDOWN.get(n, 0) <= now] or names  # all cooling down: try anyway, in order
-    for name in ready:
-        for attempt in range(3):
-            try:
-                r = call(name, messages, tools)
-                USAGE["calls"] += 1
-                USAGE["input_tokens"] += getattr(r.usage, "prompt_tokens", 0) or 0
-                USAGE["output_tokens"] += getattr(r.usage, "completion_tokens", 0) or 0
-                return r.choices[0].message, name
-            except openai.RateLimitError as e:
-                wait = e.response.headers.get("retry-after")
-                if wait and float(wait) <= MAX_WAIT_S and attempt < 2:
-                    time.sleep(float(wait) + 0.5)  # per-minute limit: wait it out on the same provider
-                    continue
-                errors.append(f"{name}: rate limited ({wait or '?'}s)")
-                break  # daily quota or too long: next provider
-            except (openai.APIConnectionError, openai.InternalServerError, openai.APITimeoutError) as e:
-                errors.append(f"{name}: {type(e).__name__}")
-                time.sleep(2 ** attempt)
-            except openai.APIStatusError as e:  # 4xx that retrying won't fix (bad key, model name, request too large)
-                errors.append(f"{name}: {e.status_code} {str(e.message)[:120]}")
-                break
-        COOLDOWN[name] = time.time() + COOLDOWN_S
+    for round_ in range(RATE_ROUNDS):
+        errors, hard, now = [], False, time.time()
+        names = [n for n in CHAIN if available(n)]
+        ready = [n for n in names if COOLDOWN.get(n, 0) <= now] or names  # all cooling down: try anyway
+        for name in ready:
+            for attempt in range(3):
+                try:
+                    r = call(name, messages, tools)
+                    USAGE["calls"] += 1
+                    USAGE["input_tokens"] += getattr(r.usage, "prompt_tokens", 0) or 0
+                    USAGE["output_tokens"] += getattr(r.usage, "completion_tokens", 0) or 0
+                    return r.choices[0].message, name
+                except openai.RateLimitError as e:
+                    wait = e.response.headers.get("retry-after")
+                    if wait and float(wait) <= MAX_WAIT_S and attempt < 2:
+                        time.sleep(float(wait) + 0.5)  # per-minute limit: wait it out on the same provider
+                        continue
+                    errors.append(f"{name}: rate limited ({wait or '?'}s)")
+                    break  # daily quota, unknown or too long: next provider
+                except (openai.APIConnectionError, openai.InternalServerError, openai.APITimeoutError) as e:
+                    errors.append(f"{name}: {type(e).__name__}")
+                    hard = True
+                    time.sleep(2 ** attempt)
+                except openai.APIStatusError as e:  # 4xx that retrying won't fix (bad key, model name, too large)
+                    errors.append(f"{name}: {e.status_code} {str(e.message)[:120]}")
+                    hard = True
+                    break
+            COOLDOWN[name] = time.time() + COOLDOWN_S
+        if hard or round_ == RATE_ROUNDS - 1:
+            break
+        time.sleep(RATE_WAIT_S)  # everything was only rate limited: give the quotas time to refill
+        COOLDOWN.clear()
     raise RuntimeError("every LLM provider failed: " + "; ".join(errors) +
-                       f". Chain={CHAIN}; set GROQ_API_KEY / GEMINI_API_KEY or run Ollama.")
+                       f". Chain={CHAIN}; available={[n for n in CHAIN if available(n)]}. "
+                       "Set GROQ_API_KEY / GEMINI_API_KEY or run Ollama.")
 
 
 def llm_json(prompt, keys):

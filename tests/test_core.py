@@ -174,6 +174,18 @@ class ChainTest(unittest.TestCase):
         tools.llm([]); tools.llm([]); tools.llm([])
         self.assertEqual(self.calls, ["groq", "gemini", "gemini", "gemini"])  # groq tried once, then skipped
 
+    def test_everything_rate_limited_waits_and_retries_instead_of_failing(self):
+        n = {"i": 0}
+
+        def b(name):
+            n["i"] += 1
+            if n["i"] <= 4:  # two full rounds of both providers limited, then quota refills
+                raise rate_limit("")
+            return FakeReply()
+        self.use(b)
+        self.assertEqual(tools.llm([])[1], "groq")
+        self.assertGreaterEqual(len(self.slept), 2)  # it waited between rounds
+
     def test_all_providers_failing_raises_with_reasons(self):
         self.use(lambda name: (_ for _ in ()).throw(rate_limit("")))
         with self.assertRaisesRegex(RuntimeError, "groq.*gemini"):
