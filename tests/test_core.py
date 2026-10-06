@@ -186,6 +186,19 @@ class ChainTest(unittest.TestCase):
         self.assertEqual(tools.llm([])[1], "groq")
         self.assertGreaterEqual(len(self.slept), 2)  # it waited between rounds
 
+    def test_out_of_credits_is_not_retried_as_a_rate_limit(self):
+        import httpx
+        import openai
+
+        def b(name):
+            if name == "groq":
+                resp = httpx.Response(429, request=httpx.Request("POST", "http://x"))
+                raise openai.RateLimitError("insufficient_quota: no credits", response=resp, body=None)
+            return FakeReply()
+        self.use(b)
+        self.assertEqual(tools.llm([])[1], "gemini")
+        self.assertEqual(self.slept, [])  # no waiting for a billing problem
+
     def test_all_providers_failing_raises_with_reasons(self):
         self.use(lambda name: (_ for _ in ()).throw(rate_limit("")))
         with self.assertRaisesRegex(RuntimeError, "groq.*gemini"):

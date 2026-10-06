@@ -17,6 +17,7 @@ USAGE = {"input_tokens": 0, "output_tokens": 0, "calls": 0}
 # Every provider speaks the OpenAI chat protocol, so one code path serves all of them.
 # name: (base_url, api-key env var, model env var, default model)
 PROVIDERS = {
+    "openai": ("https://api.openai.com/v1", "OPENAI_API_KEY", "OPENAI_MODEL", "gpt-4.1-mini"),
     "groq": ("https://api.groq.com/openai/v1", "GROQ_API_KEY", "GROQ_MODEL", "openai/gpt-oss-120b"),
     "gemini": ("https://generativelanguage.googleapis.com/v1beta/openai/", "GEMINI_API_KEY", "GEMINI_MODEL",
                "gemini-2.5-flash"),
@@ -25,7 +26,7 @@ PROVIDERS = {
                    "openai/gpt-oss-120b:free"),
     "ollama": (os.environ.get("OLLAMA_URL", "http://localhost:11434/v1"), None, "OLLAMA_MODEL", "qwen2.5:7b"),
 }
-CHAIN = [n.strip() for n in os.environ.get("LLM_CHAIN", "groq,gemini,mistral,openrouter,ollama").split(",")]
+CHAIN = [n.strip() for n in os.environ.get("LLM_CHAIN", "openai,groq,gemini,mistral,openrouter,ollama").split(",")]
 MAX_WAIT_S = 30  # a rate limit that clears sooner than this is waited out; a longer one means "quota gone"
 
 
@@ -71,6 +72,10 @@ def llm(messages, tools=None):
                     USAGE["output_tokens"] += getattr(r.usage, "completion_tokens", 0) or 0
                     return r.choices[0].message, name
                 except openai.RateLimitError as e:
+                    if "insufficient_quota" in str(e) or "credit_balance" in str(e):  # billing, not a rate limit
+                        errors.append(f"{name}: out of credits")
+                        COOLDOWN[name] = time.time() + 3600
+                        break
                     wait = e.response.headers.get("retry-after")
                     if wait and float(wait) <= MAX_WAIT_S and attempt < 2:
                         time.sleep(float(wait) + 0.5)  # per-minute limit: wait it out on the same provider
@@ -85,7 +90,7 @@ def llm(messages, tools=None):
                     errors.append(f"{name}: {e.status_code} {str(e.message)[:120]}")
                     hard = True
                     break
-            COOLDOWN[name] = time.time() + COOLDOWN_S
+            COOLDOWN[name] = max(COOLDOWN.get(name, 0), time.time() + COOLDOWN_S)
         if hard or round_ == RATE_ROUNDS - 1:
             break
         time.sleep(RATE_WAIT_S)  # everything was only rate limited: give the quotas time to refill

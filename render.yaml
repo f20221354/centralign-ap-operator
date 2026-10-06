@@ -9,7 +9,7 @@ services:
       - key: CONSOLE_PASSWORD
         generateValue: true  # Render creates a random password; read it in the dashboard under Environment
       - key: LLM_CHAIN
-        value: groq,gemini,mistral,openrouter   # no local Ollama in the cloud; providers without a key are skipped
+        value: openai,groq,gemini,mistral,openrouter   # no local Ollama in the cloud; providers without a key are skipped
       - key: ERP_URL
         value: https://centralign-ap-operator.vercel.app
       - key: ERP_API_KEY
@@ -17,6 +17,8 @@ services:
       - key: ERP_USER
         sync: false
       - key: ERP_PASS
+        sync: false
+      - key: OPENAI_API_KEY
         sync: false
       - key: GROQ_API_KEY
         sync: false
