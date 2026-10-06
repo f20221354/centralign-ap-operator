@@ -1,0 +1,3 @@
+{
+  "rewrites": [{ "source": "/(.*)", "destination": "https://centralign-operator-jfc8.onrender.com/$1" }]
+}
